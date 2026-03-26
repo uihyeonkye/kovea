@@ -11,7 +11,8 @@ import plotly.express as px
 # ==========================================
 st.set_page_config(page_title="KOVEA 마케팅 대시보드", layout="wide")
 st.sidebar.title("⚙️ 대시보드 설정")
-api_key = st.sidebar.text_input("Upstage API Key를 입력하세요", type="password")
+# api_key = st.sidebar.text_input("Upstage API Key를 입력하세요", type="password")
+api_key = st.secrets["UPSTAGE_API_KEY"]
 
 st.title("⛺ KOVEA 초캠 카페 여론 통합 분석 대시보드")
 st.markdown("월별 주요 이슈부터 연간 트렌드, 타사 경쟁 제품 매치업, 구매 여정까지 한눈에 파악합니다.")
