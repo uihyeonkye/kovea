@@ -64,7 +64,7 @@ def load_analyzed_data():
 df = load_analyzed_data()
 
 if not df.empty:
-    tab1, tab2 = st.tabs(["📅 월별 상세 분석 대시보드", "📈 연간 통합 대시보드 (라이벌 매치업)"])
+    tab1, tab2, tab3 = st.tabs(["📅 월별 상세 분석", "📈 연간 통합 대시보드", "💡 마케팅 액션 인사이트"])
     
     # --- [TAB 1] 월별 대시보드 ---
     with tab1:
@@ -228,3 +228,88 @@ if not df.empty:
                 st.plotly_chart(fig_tree, use_container_width=True)
             else:
                 st.info("비교 언급된 타사 브랜드 데이터가 부족합니다.")
+
+    # ==========================================
+    # [TAB 3] 마케팅 액션 인사이트 (콘텐츠 & 전략 도출)
+    # ==========================================
+    with tab3:
+        st.subheader("🎯 실무 밀착형 마케팅 전략 도출")
+        st.markdown("데이터를 기반으로 다음 달 SNS 콘텐츠 주제와 프로모션 타겟 제품을 선정합니다.")
+        
+        # 순수 제품 데이터만 필터링
+        df_valid = df[~df['제품_분류'].isin(['코베아 단순언급', '기타'])].copy()
+        
+        # ------------------------------------------
+        # 1. 언급량 vs 관심도(조회수) 4분면 매트릭스
+        # ------------------------------------------
+        st.markdown("#### 🔍 1. 제품 포지셔닝 매트릭스 (숨은 히트 예감 제품 찾기)")
+        
+        # 제품별 언급량과 평균 조회수 계산
+        df_matrix = df_valid.groupby('제품_분류').agg(
+            언급량=('제품_분류', 'count'),
+            평균조회수=('views', 'mean')
+        ).reset_index()
+        
+        # 평균값(기준선) 계산
+        med_mention = df_matrix['언급량'].median()
+        med_views = df_matrix['평균조회수'].median()
+        
+        fig_matrix = px.scatter(df_matrix, x='언급량', y='평균조회수', text='제품_분류', size='평균조회수', 
+                                color='언급량', color_continuous_scale='Sunset',
+                                title="👉 우측 상단: 현재 대세 / 좌측 상단: 정보 부족(콘텐츠 발행 시 효율 극대화)")
+        
+        # 사분면 기준선 긋기
+        fig_matrix.add_hline(y=med_views, line_dash="dash", line_color="gray")
+        fig_matrix.add_vline(x=med_mention, line_dash="dash", line_color="gray")
+        fig_matrix.update_traces(textposition='top center')
+        fig_matrix.update_layout(height=500, template="plotly_white")
+        st.plotly_chart(fig_matrix, use_container_width=True)
+        
+        st.markdown("---")
+        
+        # ------------------------------------------
+        # 2. 구매 여정별 (질문 vs 후기) 맞춤형 페인포인트
+        # ------------------------------------------
+        st.markdown("#### 🗣️ 2. 구매 여정별 핵심 키워드 (맞춤형 콘텐츠 기획용)")
+        col_j1, col_j2 = st.columns(2)
+        
+        with col_j1:
+            st.info("🤔 **[구매 전] 고객들이 가장 망설이는 포인트** \n\n👉 상세페이지 보강 및 리뷰 영상 주제로 활용하세요.")
+            df_before = df_valid[(df_valid['journey'] == '구매전') & (df_valid['pain_point'] != '')]
+            if not df_before.empty:
+                before_counts = df_before['pain_point'].value_counts().head(7).reset_index()
+                before_counts.columns = ['고민 포인트', '언급량']
+                fig_before = px.bar(before_counts, x='언급량', y='고민 포인트', orientation='h', color_discrete_sequence=['#FF9F43'])
+                fig_before.update_layout(yaxis={'categoryorder':'total ascending'}, height=300, margin=dict(l=0, r=0, t=0, b=0))
+                st.plotly_chart(fig_before, use_container_width=True)
+                
+        with col_j2:
+            st.success("⛺ **[구매 후] 실제 사용 시 겪는 핵심 불편함** \n\n👉 AS팀 공유 및 '올바른 사용법' SNS 꿀팁 콘텐츠로 활용하세요.")
+            df_after = df_valid[(df_valid['journey'] == '구매후') & (df_valid['pain_point'] != '')]
+            if not df_after.empty:
+                after_counts = df_after['pain_point'].value_counts().head(7).reset_index()
+                after_counts.columns = ['불만 포인트', '언급량']
+                fig_after = px.bar(after_counts, x='언급량', y='불만 포인트', orientation='h', color_discrete_sequence=['#EA5455'])
+                fig_after.update_layout(yaxis={'categoryorder':'total ascending'}, height=300, margin=dict(l=0, r=0, t=0, b=0))
+                st.plotly_chart(fig_after, use_container_width=True)
+
+        st.markdown("---")
+        
+        # ------------------------------------------
+        # 3. 제품별 계절성(Seasonality) 히트맵
+        # ------------------------------------------
+        st.markdown("#### ❄️ 3. 연간 제품별 계절성 (Seasonality) 트렌드 히트맵")
+        st.write("진한 색상일수록 해당 월에 폭발적인 관심을 받았음을 의미합니다. 내년 프로모션 일정을 짤 때 참고하세요.")
+        
+        # 피벗 테이블로 데이터 형태 변환 (X축: 월, Y축: 제품명, 값: 언급량)
+        df_heat = df_valid.groupby(['제품_분류', 'year_month']).size().reset_index(name='count')
+        # 상위 15개 제품만 필터링 (너무 많으면 보기 힘듦)
+        top_15_prods = df_valid['제품_분류'].value_counts().head(15).index
+        df_heat_top = df_heat[df_heat['제품_분류'].isin(top_15_prods)]
+        
+        heat_pivot = df_heat_top.pivot(index='제품_분류', columns='year_month', values='count').fillna(0)
+        
+        fig_heat = px.imshow(heat_pivot, text_auto=True, aspect="auto", color_continuous_scale='Greens',
+                             labels=dict(x="연월", y="제품명", color="언급량"))
+        fig_heat.update_layout(height=500, margin=dict(l=0, r=0, t=10, b=0))
+        st.plotly_chart(fig_heat, use_container_width=True)
