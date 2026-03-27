@@ -77,15 +77,21 @@ if not df.empty:
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("총 언급 게시글", f"{len(df_month)} 건")
         c2.metric("총 조회수", f"{df_month['views'].sum():,.0f} 회")
-        c3.metric("가장 많이 언급된 제품", df_month['제품_분류'].mode()[0] if not df_month.empty else "-")
+        
+        # 💡 [수정됨] '코베아 단순언급'과 '기타'를 제외한 순수 제품 리스트 만들기
+        df_valid_products = df_month[~df_month['제품_분류'].isin(['코베아 단순언급', '기타'])]
+        top_product = df_valid_products['제품_분류'].mode()[0] if not df_valid_products.empty else "-"
+        
+        c3.metric("가장 많이 언급된 제품", top_product)
         c4.metric("주요 구매 여정", df_month['journey'].mode()[0] if not df_month.empty else "-")
         
         st.markdown("---")
         
         col1, col2 = st.columns(2)
         with col1:
-            top_products = df_month['제품_분류'].value_counts().reset_index().head(10)
-            fig_prod = px.bar(top_products, x='count', y='제품_분류', orientation='h', title="🏆 제품별 언급 수 TOP 10")
+            # 💡 [수정됨] 바로 밑에 있는 바 차트(TOP 10)에서도 동일하게 제외되도록 df_valid_products를 사용합니다.
+            top_products = df_valid_products['제품_분류'].value_counts().reset_index().head(10)
+            fig_prod = px.bar(top_products, x='count', y='제품_분류', orientation='h', title="🏆 순수 제품별 언급 수 TOP 10")
             fig_prod.update_layout(yaxis={'categoryorder':'total ascending'})
             st.plotly_chart(fig_prod, use_container_width=True)
             
