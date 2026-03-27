@@ -136,8 +136,67 @@ if not df.empty:
 
     # --- [TAB 2] 연간 통합 대시보드 ---
     with tab2:
-        st.subheader("📅 계절성 및 연간 경쟁 트렌드 분석")
+        st.subheader("🏆 연간 마케팅 결산 명예의 전당 TOP 5")
         
+        # 1. TOP 5 데이터 준비 (기타 및 단순언급 제외)
+        df_valid = df[~df['제품_분류'].isin(['코베아 단순언급', '기타'])].copy()
+        
+        # 제품별 카테고리 매핑 (데이터 누락 방지용)
+        category_map = {
+            '네스트 W': '텐트/타프', '네스트 2': '텐트/타프', '고스트 팬텀': '텐트/타프', 
+            '몬스터': '텐트/타프', '문리버': '텐트/타프', '이스턴': '텐트/타프', 
+            '아웃백': '텐트/타프', '퀀텀골드': '텐트/타프',
+            '구이바다': '버너/스토브', '캠프원': '버너/스토브', 
+            '기가썬': '난로/히터', '에어매트/침대류': '매트/침구',
+            '크레모아 콜라보': '조명/액세서리', '소품류(망치 등)': '캠핑 소품', '소품류(토치 등)': '캠핑 소품'
+        }
+        df_valid['카테고리'] = df_valid['제품_분류'].map(category_map).fillna('기타')
+        
+        # 타사 브랜드 추출
+        all_competitors = []
+        if 'competitors' in df.columns:
+            for comps in df['competitors']:
+                if isinstance(comps, list):
+                    for c in comps:
+                        b = c.get('brand', '')
+                        if b and not any(x in str(b).upper() for x in ['코베아', 'KOVEA']):
+                            all_competitors.append(b)
+        
+        # 2. TOP 5 계산
+        top5_prod = df_valid['제품_분류'].value_counts().reset_index().head(5)
+        top5_prod.columns = ['제품명', '언급량']
+        
+        top5_cat = df_valid[df_valid['카테고리'] != '기타']['카테고리'].value_counts().reset_index().head(5)
+        top5_cat.columns = ['카테고리', '언급량']
+        
+        top5_brand = pd.Series(all_competitors).value_counts().reset_index().head(5)
+        top5_brand.columns = ['타사 브랜드', '언급량']
+        
+        # 3. 3분할 화면에 가로 막대 그래프 그리기
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("##### 🥇 가장 많이 언급된 제품")
+            fig1 = px.bar(top5_prod, x='언급량', y='제품명', orientation='h', color_discrete_sequence=['#00CC96'])
+            fig1.update_layout(yaxis={'categoryorder':'total ascending'}, height=280, margin=dict(l=0, r=0, t=10, b=0))
+            st.plotly_chart(fig1, use_container_width=True)
+            
+        with col2:
+            st.markdown("##### 📁 가장 많이 언급된 카테고리")
+            fig2 = px.bar(top5_cat, x='언급량', y='카테고리', orientation='h', color_discrete_sequence=['#636EFA'])
+            fig2.update_layout(yaxis={'categoryorder':'total ascending'}, height=280, margin=dict(l=0, r=0, t=10, b=0))
+            st.plotly_chart(fig2, use_container_width=True)
+            
+        with col3:
+            st.markdown("##### 🥊 가장 많이 언급된 타사 브랜드")
+            fig3 = px.bar(top5_brand, x='언급량', y='타사 브랜드', orientation='h', color_discrete_sequence=['#EF553B'])
+            fig3.update_layout(yaxis={'categoryorder':'total ascending'}, height=280, margin=dict(l=0, r=0, t=10, b=0))
+            st.plotly_chart(fig3, use_container_width=True)
+
+        st.markdown("---")
+        
+        # 4. 기존 연간 트렌드 차트 유지
+        st.subheader("📅 계절성 및 연간 경쟁 트렌드 분석")
         df_trend = df.groupby(['year_month', 'sentiment']).size().reset_index(name='count')
         fig_trend = px.line(df_trend, x='year_month', y='count', color='sentiment', markers=True,
                             title="월별 언급량 및 여론 동향 추이",
@@ -145,15 +204,15 @@ if not df.empty:
         st.plotly_chart(fig_trend, use_container_width=True)
         
         st.markdown("---")
-        st.subheader("🆚 코베아 라인업별 타사 라이벌 매치업 지형도")
         
+        # 5. 기존 라이벌 매치업 트리맵 유지
+        st.subheader("🆚 코베아 라인업별 타사 라이벌 매치업 지형도")
         if 'competitors' in df.columns:
             comp_data = []
             for idx, row in df.iterrows():
                 if isinstance(row['competitors'], list):
                     for comp in row['competitors']:
                         brand = comp.get('brand', '')
-                        # 경쟁사에서 코베아 제외 로직
                         if brand and not any(x in str(brand).upper() for x in ['코베아', 'KOVEA']):
                             comp_data.append({'코베아_제품': row['제품_분류'], '타사_브랜드': brand})
                             
