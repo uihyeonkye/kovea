@@ -104,15 +104,25 @@ if not df.empty:
             
         st.markdown("---")
         
+        # 2. 🫧 [신규] 핵심 불만(Pain Point) 버블 차트
         st.subheader("🫧 고객 핵심 불만 (Pain Point) 버블 차트")
         if 'pain_point' in df_month.columns:
+            # 기본 전처리 (빈 불만 사항 제외 및 그룹화)
             df_pain = df_month[df_month['pain_point'] != ''].groupby('pain_point').agg({'제품_분류':'count', '화제성_점수':'sum'}).reset_index()
             df_pain.rename(columns={'제품_분류':'언급횟수'}, inplace=True)
             
             if not df_pain.empty:
-                fig_bubble = px.scatter(df_pain, x='pain_point', y='언급횟수', size='화제성_점수', color='pain_point',
-                                        title="불만 요인 파급력 분석 (버블 크기 = 화제성 점수)",
+                # 💡 [핵심 수정] 화제성 점수가 높은 순으로 정렬 후 상위 10개만 추출
+                # (버블 크기가 큰 녀석들이 화제성이 높은 핵심 불만입니다!)
+                df_pain_top10 = df_pain.sort_values(by='화제성_점수', ascending=False).head(10)
+                
+                # 💡 Plotly Express가 자동으로 y축(언급횟수) 범위를 'TOP 10 데이터'에 맞춰줘서 더 보기 좋아집니다.
+                fig_bubble = px.scatter(df_pain_top10, x='pain_point', y='언급횟수', size='화제성_점수', color='pain_point',
+                                        title="TOP 10 불만 요인 파급력 분석 (버블 크기 = 화제성 점수)",
                                         size_max=50, template="plotly_white")
+                
+                # 💡 버블 수가 줄었으니, 그래프 높이를 살짝 키워서(height=500) 겹침을 더 줄였습니다.
+                fig_bubble.update_layout(height=500, margin=dict(l=10, r=10, t=50, b=10))
                 st.plotly_chart(fig_bubble, use_container_width=True)
             else:
                 st.info("해당 월에 감지된 뚜렷한 불만(Pain Point)이 없습니다.")
