@@ -240,9 +240,9 @@ if not df.empty:
         df_valid = df[~df['제품_분류'].isin(['코베아 단순언급', '기타'])].copy()
         
         # ------------------------------------------
-        # 1. 언급량 vs 관심도(조회수) 4분면 매트릭스
+        # 1. 제품 포지셔닝 매트릭스 (숨은 히트 예감 제품 찾기)
         # ------------------------------------------
-        st.markdown("#### 🔍 1. 제품 포지셔닝 매트릭스 (숨은 히트 예감 제품 찾기)")
+        st.markdown("#### 🔍 1. 제품 포지셔닝 매트릭스 (숨은 히트 예감 찾기)")
         
         # 제품별 언급량과 평균 조회수 계산
         df_matrix = df_valid.groupby('제품_분류').agg(
@@ -250,18 +250,27 @@ if not df.empty:
             평균조회수=('views', 'mean')
         ).reset_index()
         
+        # 💡 [핵심 스킬 1] 노이즈 제거: 언급량이 3회 미만인 '먼지 데이터'는 분석에서 제외하여 깔끔하게 만듭니다.
+        # (원하시면 이 숫자 '3'을 5나 10으로 늘려서 더 굵직한 제품만 남길 수도 있습니다!)
+        df_matrix = df_matrix[df_matrix['언급량'] >= 3]
+        
         # 평균값(기준선) 계산
         med_mention = df_matrix['언급량'].median()
         med_views = df_matrix['평균조회수'].median()
         
-        fig_matrix = px.scatter(df_matrix, x='언급량', y='평균조회수', text='제품_분류', size='평균조회수', 
+        # 💡 [핵심 스킬 2] text='제품_분류'를 지우고, hover_name='제품_분류'로 변경!
+        fig_matrix = px.scatter(df_matrix, x='언급량', y='평균조회수', 
+                                hover_name='제품_분류', # 마우스를 올리면 예쁜 말풍선이 뜹니다
+                                size='평균조회수', 
                                 color='언급량', color_continuous_scale='Sunset',
                                 title="👉 우측 상단: 현재 대세 / 좌측 상단: 정보 부족(콘텐츠 발행 시 효율 극대화)")
         
         # 사분면 기준선 긋기
         fig_matrix.add_hline(y=med_views, line_dash="dash", line_color="gray")
         fig_matrix.add_vline(x=med_mention, line_dash="dash", line_color="gray")
-        fig_matrix.update_traces(textposition='top center')
+        
+        # 점(버블)의 테두리를 살짝 그려줘서 겹쳐도 구분하기 쉽게 시각화 보정
+        fig_matrix.update_traces(marker=dict(line=dict(width=1, color='DarkSlateGrey')))
         fig_matrix.update_layout(height=500, template="plotly_white")
         st.plotly_chart(fig_matrix, use_container_width=True)
         
