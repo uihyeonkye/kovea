@@ -309,18 +309,28 @@ if not df.empty:
         # ------------------------------------------
         # 3. 제품별 계절성(Seasonality) 히트맵
         # ------------------------------------------
-        st.markdown("#### ❄️ 3. 연간 제품별 계절성 (Seasonality) 트렌드 히트맵")
-        st.write("진한 색상일수록 해당 월에 폭발적인 관심을 받았음을 의미합니다. 내년 프로모션 일정을 짤 때 참고하세요.")
+        st.markdown("#### ❄️ 3. 연간 제품별 계절성 (Share of Voice) 히트맵")
+        st.write("해당 월의 전체 게시글 중 특정 제품이 차지하는 **언급 비중(%)**입니다. 성수기 전체 트래픽 증가로 인한 착시를 제거했습니다.")
         
-        # 피벗 테이블로 데이터 형태 변환 (X축: 월, Y축: 제품명, 값: 언급량)
+        # 💡 [핵심] 월별 전체 언급량(분모) 계산
+        monthly_totals = df_valid.groupby('year_month').size()
+        
+        # 제품별/월별 언급량 계산
         df_heat = df_valid.groupby(['제품_분류', 'year_month']).size().reset_index(name='count')
-        # 상위 15개 제품만 필터링 (너무 많으면 보기 힘듦)
+        
+        # 상위 15개 제품만 필터링
         top_15_prods = df_valid['제품_분류'].value_counts().head(15).index
         df_heat_top = df_heat[df_heat['제품_분류'].isin(top_15_prods)]
         
+        # 피벗 테이블 생성
         heat_pivot = df_heat_top.pivot(index='제품_분류', columns='year_month', values='count').fillna(0)
         
-        fig_heat = px.imshow(heat_pivot, text_auto=True, aspect="auto", color_continuous_scale='Greens',
-                             labels=dict(x="연월", y="제품명", color="언급량"))
+        # 💡 [핵심 스킬] 단순 개수가 아닌, '해당 월 전체 게시글 대비 비중(%)'으로 변환
+        heat_pivot_ratio = heat_pivot.div(monthly_totals, axis=1).fillna(0) * 100
+        heat_pivot_ratio = heat_pivot_ratio.round(1) # 소수점 첫째 자리까지 깔끔하게
+        
+        # 텍스트 포맷을 '.1f' (소수점 1자리)로 설정
+        fig_heat = px.imshow(heat_pivot_ratio, text_auto=".1f", aspect="auto", color_continuous_scale='Greens',
+                             labels=dict(x="연월", y="제품명", color="점유율(%)"))
         fig_heat.update_layout(height=500, margin=dict(l=0, r=0, t=10, b=0))
         st.plotly_chart(fig_heat, use_container_width=True)
